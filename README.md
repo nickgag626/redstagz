@@ -28,7 +28,31 @@ npm run dev
 - `/` public trade block
 - `/offer` public trade proposal form
 
+## One-time keepers import (no scraping)
+
+Since Yahoo’s pre-draft keepers view doesn’t map cleanly to the roster API, the MVP importer is a **one-time seed** based on the keeper page paste.
+
+### 1) Add env var
+Add to Vercel (or `.env.local`):
+- `IMPORT_SECRET` = a long random string
+
+### 2) Run the import (once)
+Send a POST to:
+- `/api/admin/import-keepers`
+
+with header:
+- `x-import-secret: <IMPORT_SECRET>`
+
+Example:
+```bash
+curl -X POST \
+  -H "x-import-secret: $IMPORT_SECRET" \
+  https://<your-domain>/api/admin/import-keepers
+```
+
+This will upsert 28 players into `players` and add them to `my_roster_players` with `is_available=true`.
+
 ## Next steps
-- One-time keepers import (Playwright scrape of `/keepers` + Yahoo API enrichment)
+- Replace hardcoded importer with real scrape+enrichment (optional)
 - Admin dashboard to toggle keeper status + availability
 - Offer inbox for admin
