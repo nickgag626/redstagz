@@ -166,6 +166,7 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
                         <span>{p.position ?? '—'}</span>
                       )}
                     </div>
+
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm truncate flex items-center gap-2">
                         <span>{p.fullName}</span>
@@ -179,6 +180,32 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
                         {p.notes ? <span className="text-accent">{p.notes}</span> : null}
                       </div>
                     </div>
+
+                    {/* row stats */}
+                    <div className="hidden md:flex items-center gap-3 text-xs font-mono text-muted-foreground">
+                      {(isPitcher(p.position)
+                        ? [
+                            { label: 'W', value: getLabeledStat(p.stats2025, ['W']) },
+                            { label: 'K', value: getLabeledStat(p.stats2025, ['K']) },
+                            { label: 'ERA', value: getLabeledStat(p.stats2025, ['ERA']) },
+                            { label: 'WHIP', value: getLabeledStat(p.stats2025, ['WHIP']) },
+                            { label: 'SV+H', value: getLabeledStat(p.stats2025, ['SV+H', 'SV+HLD', 'SV+HOLD']) },
+                          ]
+                        : [
+                            { label: 'R', value: getLabeledStat(p.stats2025, ['R']) },
+                            { label: 'HR', value: getLabeledStat(p.stats2025, ['HR']) },
+                            { label: 'RBI', value: getLabeledStat(p.stats2025, ['RBI']) },
+                            { label: 'SB', value: getLabeledStat(p.stats2025, ['SB']) },
+                            { label: 'OBP', value: getLabeledStat(p.stats2025, ['OBP']) },
+                          ])
+                        .map((s) => (
+                          <span key={s.label}>
+                            {s.label}:{' '}
+                            <span className="text-foreground">{s.value ?? '—'}</span>
+                          </span>
+                        ))}
+                    </div>
+
                     <div className="text-xs text-muted-foreground">{p.keeperStatus}</div>
                   </div>
                 ))}
