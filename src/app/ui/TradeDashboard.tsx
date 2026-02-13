@@ -50,9 +50,10 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
       .sort((a, b) => a - b)
       .join(', #')} for ${selected.fullName}`
 
-    // lightweight "identity" for public users; they can put their name in notes for now.
+    // lightweight identity for public users
     const payload = {
-      displayName: 'Anonymous',
+      teamName: 'Unknown team',
+      displayName: '',
       email: '',
       requestedPlayerId: selected.playerId,
       offerText,

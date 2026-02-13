@@ -3,6 +3,7 @@
 import { useState } from 'react'
 
 export function OfferForm() {
+  const [teamName, setTeamName] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [offerText, setOfferText] = useState('')
@@ -21,7 +22,7 @@ export function OfferForm() {
     const res = await fetch('/api/offers', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ displayName, email, offerText, message, requestedPlayerId }),
+      body: JSON.stringify({ teamName, displayName, email, offerText, message, requestedPlayerId }),
     })
 
     if (!res.ok) {
@@ -46,12 +47,23 @@ export function OfferForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium">Your name</label>
+        <label className="block text-sm font-medium">Your team name</label>
+        <input
+          className="mt-1 w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
+          value={teamName}
+          onChange={(e) => setTeamName(e.target.value)}
+          required
+          placeholder="Example: Tunnel Snakes"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium">Your name (optional)</label>
         <input
           className="mt-1 w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
-          required
+          placeholder="Example: Chris"
         />
       </div>
 
