@@ -2,7 +2,9 @@
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import { Search, Users, ArrowRightLeft } from 'lucide-react'
+import { Search, Users, ArrowRightLeft, Check, X, Zap } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { toast } from 'sonner'
 
 export type TradePlayer = {
   rosterRowId: string
@@ -14,10 +16,64 @@ export type TradePlayer = {
   notes?: string | null
 }
 
+const DRAFT_PICKS = Array.from({ length: 24 }, (_, i) => i + 1)
+
 export function TradeDashboard({ players }: { players: TradePlayer[] }) {
   const [selected, setSelected] = useState<TradePlayer | null>(null)
   const [search, setSearch] = useState('')
   const [posFilter, setPosFilter] = useState('ALL')
+
+  const [selectedPicks, setSelectedPicks] = useState<number[]>([])
+  const [notes, setNotes] = useState('')
+  const [submitted, setSubmitted] = useState(false)
+
+  const togglePick = (pick: number) => {
+    setSelectedPicks((prev) => (prev.includes(pick) ? prev.filter((p) => p !== pick) : [...prev, pick]))
+  }
+
+  const clearTrade = () => {
+    setSelectedPicks([])
+    setNotes('')
+    setSelected(null)
+  }
+
+  const submitOffer = async () => {
+    if (!selected || selectedPicks.length === 0) return
+
+    // MVP: create a clear offer text from picks. Manager still writes details in notes.
+    const offerText = `Offering picks #${selectedPicks
+      .slice()
+      .sort((a, b) => a - b)
+      .join(', #')} for ${selected.fullName}`
+
+    // lightweight "identity" for public users; they can put their name in notes for now.
+    const payload = {
+      displayName: 'Anonymous',
+      email: '',
+      requestedPlayerId: selected.playerId,
+      offerText,
+      message: notes,
+    }
+
+    const res = await fetch('/api/offers', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    if (!res.ok) {
+      const t = await res.text().catch(() => '')
+      toast.error(t || 'Failed to submit offer')
+      return
+    }
+
+    setSubmitted(true)
+    toast.success(`Trade offer sent! ${selectedPicks.length} pick(s) for ${selected.fullName}`, { duration: 4000 })
+    setTimeout(() => {
+      setSubmitted(false)
+      clearTrade()
+    }, 1500)
+  }
 
   const positions = useMemo(() => {
     const set = new Set<string>()
@@ -125,55 +181,124 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
             <div className="dashboard-card flex flex-col">
               <h2 className="text-lg font-extrabold tracking-tight mb-3 flex items-center gap-2">
                 <ArrowRightLeft className="w-4 h-4 text-primary" />
-                Propose a Trade
+                Make a Trade
               </h2>
 
-              {!selected ? (
-                <div className="flex-1 flex flex-col items-center justify-center py-12 text-center">
-                  <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
-                    <ArrowRightLeft className="w-7 h-7 text-muted-foreground" />
-                  </div>
-                  <p className="text-muted-foreground text-sm font-medium">
-                    Select a player from the list to start a proposal.
-                  </p>
-                </div>
-              ) : (
-                <div className="flex-1 flex flex-col">
-                  <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/30 mb-4">
-                    <div className="w-11 h-11 rounded-xl bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0">
-                      {selected.position ?? '—'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-sm">{selected.fullName}</div>
-                      <div className="text-xs text-muted-foreground">{selected.mlbTeam ?? '—'}</div>
-                    </div>
-                    <button
-                      onClick={() => setSelected(null)}
-                      className="px-2 py-1 rounded-lg hover:bg-secondary transition-colors text-xs text-muted-foreground"
-                    >
-                      Clear
-                    </button>
-                  </div>
-
-                  {selected.notes ? (
-                    <div className="mb-4 p-3 rounded-xl bg-accent/10 border border-accent/30">
-                      <div className="text-xs text-muted-foreground mb-1">Notes</div>
-                      <div className="text-sm font-semibold">{selected.notes}</div>
-                    </div>
-                  ) : null}
-
-                  <Link
-                    href={`/offer?player=${encodeURIComponent(selected.playerId)}`}
-                    className="btn-trade w-full mt-auto text-center"
+              <AnimatePresence mode="wait">
+                {!selected ? (
+                  <motion.div
+                    key="empty"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex-1 flex flex-col items-center justify-center py-12 text-center"
                   >
-                    Write offer for {selected.fullName}
-                  </Link>
+                    <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
+                      <Zap className="w-7 h-7 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground text-sm font-medium">
+                      Select a player from the roster to start a trade
+                    </p>
+                  </motion.div>
+                ) : submitted ? (
+                  <motion.div
+                    key="submitted"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex-1 flex flex-col items-center justify-center py-12 text-center"
+                  >
+                    <div className="w-16 h-16 rounded-full bg-success/20 flex items-center justify-center mb-4">
+                      <Check className="w-8 h-8 text-success" />
+                    </div>
+                    <p className="text-foreground font-bold text-lg">Trade Submitted!</p>
+                    <p className="text-muted-foreground text-sm mt-1">Awaiting review</p>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="trade-form"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    className="flex-1 flex flex-col"
+                  >
+                    {/* Selected player */}
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/30 mb-4">
+                      <div className="w-11 h-11 rounded-xl bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                        {selected.position ?? '—'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-sm">{selected.fullName}</div>
+                        <div className="text-xs text-muted-foreground">{selected.mlbTeam ?? '—'}</div>
+                      </div>
+                      <button
+                        onClick={clearTrade}
+                        className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
+                        aria-label="Clear"
+                      >
+                        <X className="w-4 h-4 text-muted-foreground" />
+                      </button>
+                    </div>
 
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    Offers are free-text (picks/players/cash—anything). I’ll respond if it’s a fit.
-                  </p>
-                </div>
-              )}
+                    {/* Draft picks */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-semibold">Offer Draft Picks</span>
+                        {selectedPicks.length > 0 ? (
+                          <span className="text-xs text-accent font-bold">{selectedPicks.length} selected</span>
+                        ) : null}
+                      </div>
+                      <div className="grid grid-cols-8 sm:grid-cols-12 gap-1.5">
+                        {DRAFT_PICKS.map((pick) => (
+                          <button
+                            key={pick}
+                            onClick={() => togglePick(pick)}
+                            className={`inline-flex items-center justify-center w-10 h-10 rounded-lg text-sm font-bold border border-border cursor-pointer transition-all duration-150 active:scale-95 ${
+                              selectedPicks.includes(pick)
+                                ? 'bg-accent text-accent-foreground border-accent shadow-[0_0_12px_hsl(var(--accent)/0.3)]'
+                                : 'bg-secondary text-muted-foreground hover:border-accent hover:text-accent'
+                            }`}
+                          >
+                            {pick}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Notes */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-semibold mb-2">Notes (optional)</label>
+                      <textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Add any context (players you’re offering, positions you need, etc.)"
+                        className="w-full min-h-[90px] rounded-lg border border-border bg-secondary px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      />
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        This submits a free-text offer + your selected picks. Add anything else here.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={submitOffer}
+                      disabled={selectedPicks.length === 0}
+                      className="btn-trade w-full mt-auto"
+                    >
+                      {selectedPicks.length === 0
+                        ? 'Select picks to offer'
+                        : `Submit Trade (${selectedPicks.length} pick${selectedPicks.length > 1 ? 's' : ''})`}
+                    </button>
+
+                    <div className="mt-3 text-xs text-muted-foreground">
+                      Prefer writing a detailed offer?{' '}
+                      <Link href={`/offer?player=${encodeURIComponent(selected.playerId)}`} className="underline">
+                        Use the full form
+                      </Link>
+                      .
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>

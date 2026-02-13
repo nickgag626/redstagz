@@ -7,6 +7,7 @@ const BodySchema = z.object({
   email: z.string().email().max(254).optional().or(z.literal('')),
   offerText: z.string().min(3).max(5000),
   message: z.string().max(5000).optional().or(z.literal('')),
+  requestedPlayerId: z.string().uuid().optional(),
 })
 
 export async function POST(req: Request) {
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
     return new NextResponse(parsed.error.message, { status: 400 })
   }
 
-  const { displayName, email, offerText, message } = parsed.data
+  const { displayName, email, offerText, message, requestedPlayerId } = parsed.data
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
     yahoo_league_key: leagueKey,
     yahoo_team_key: teamKey,
     from_manager_id: manager.id,
+    requested_player_id: requestedPlayerId ?? null,
     offer_text: offerText,
     message: message || null,
     status: 'submitted',
