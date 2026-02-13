@@ -193,11 +193,15 @@ export async function POST(req: Request) {
         raw: rawStats,
       }
 
+      const headshot = pickFromYahooList(best, 'headshot')
+      const headshotUrl = headshot?.url ? String(headshot.url) : null
+
       const { error: upErr } = await supabase
         .from('players')
         .update({
           yahoo_player_key: String(yahooPlayerKey),
           yahoo_player_id: yahooPlayerId ? String(yahooPlayerId) : null,
+          headshot_url: headshotUrl,
           stats_2025: payload,
           stats_2025_updated_at: now,
         })

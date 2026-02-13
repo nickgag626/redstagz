@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import { Search, Users, ArrowRightLeft, Check, X, Zap } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
+import { getLabeledStat, isPitcher } from '@/app/ui/stats'
 
 export type TradePlayer = {
   rosterRowId: string
@@ -14,6 +15,9 @@ export type TradePlayer = {
   position?: string | null
   keeperStatus: string
   notes?: string | null
+  headshotUrl?: string | null
+  ecr?: number | null
+  stats2025?: any | null
 }
 
 const DRAFT_PICKS = Array.from({ length: 24 }, (_, i) => i + 1)
@@ -154,13 +158,23 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
                     onClick={() => setSelected(p)}
                     className={`player-row ${selected?.rosterRowId === p.rosterRowId ? 'selected' : ''}`}
                   >
-                    <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
-                      {p.position ?? '—'}
+                    <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0 overflow-hidden">
+                      {p.headshotUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.headshotUrl} alt={p.fullName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span>{p.position ?? '—'}</span>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm truncate">{p.fullName}</div>
+                      <div className="font-semibold text-sm truncate flex items-center gap-2">
+                        <span>{p.fullName}</span>
+                        {typeof p.ecr === 'number' ? (
+                          <span className="stat-badge bg-accent/10 text-accent">ECR #{p.ecr}</span>
+                        ) : null}
+                      </div>
                       <div className="text-xs text-muted-foreground">
-                        {p.mlbTeam ?? '—'}
+                        {p.position ?? '—'} · {p.mlbTeam ?? '—'}
                         {p.notes ? ' · ' : ''}
                         {p.notes ? <span className="text-accent">{p.notes}</span> : null}
                       </div>
@@ -224,12 +238,22 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
                   >
                     {/* Selected player */}
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/30 mb-4">
-                      <div className="w-11 h-11 rounded-xl bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0">
-                        {selected.position ?? '—'}
+                      <div className="w-11 h-11 rounded-xl bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0 overflow-hidden">
+                        {selected.headshotUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={selected.headshotUrl} alt={selected.fullName} className="w-full h-full object-cover" />
+                        ) : (
+                          <span>{selected.position ?? '—'}</span>
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-bold text-sm">{selected.fullName}</div>
-                        <div className="text-xs text-muted-foreground">{selected.mlbTeam ?? '—'}</div>
+                        <div className="font-bold text-sm flex items-center gap-2">
+                          <span>{selected.fullName}</span>
+                          {typeof selected.ecr === 'number' ? (
+                            <span className="stat-badge bg-accent/10 text-accent">ECR #{selected.ecr}</span>
+                          ) : null}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{selected.position ?? '—'} · {selected.mlbTeam ?? '—'}</div>
                       </div>
                       <button
                         onClick={clearTrade}
@@ -238,6 +262,31 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
                       >
                         <X className="w-4 h-4 text-muted-foreground" />
                       </button>
+                    </div>
+
+                    {/* Statline */}
+                    <div className="grid grid-cols-5 gap-2 mb-4">
+                      {(isPitcher(selected.position)
+                        ? [
+                            { label: 'W', value: getLabeledStat(selected.stats2025, ['W']) },
+                            { label: 'K', value: getLabeledStat(selected.stats2025, ['K']) },
+                            { label: 'ERA', value: getLabeledStat(selected.stats2025, ['ERA']) },
+                            { label: 'WHIP', value: getLabeledStat(selected.stats2025, ['WHIP']) },
+                            { label: 'SV+H', value: getLabeledStat(selected.stats2025, ['SV+H', 'SV+HLD', 'SV+HOLD']) },
+                          ]
+                        : [
+                            { label: 'R', value: getLabeledStat(selected.stats2025, ['R']) },
+                            { label: 'HR', value: getLabeledStat(selected.stats2025, ['HR']) },
+                            { label: 'RBI', value: getLabeledStat(selected.stats2025, ['RBI']) },
+                            { label: 'SB', value: getLabeledStat(selected.stats2025, ['SB']) },
+                            { label: 'OBP', value: getLabeledStat(selected.stats2025, ['OBP']) },
+                          ])
+                        .map((stat) => (
+                          <div key={stat.label} className="text-center p-2 rounded-lg bg-secondary">
+                            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{stat.label}</div>
+                            <div className="text-sm font-bold font-mono">{stat.value ?? '—'}</div>
+                          </div>
+                        ))}
                     </div>
 
                     {/* Draft picks */}
