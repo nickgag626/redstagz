@@ -397,13 +397,13 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm truncate flex items-center gap-2">
-                        <span>{p.fullName}</span>
+                      <div className="font-semibold text-sm flex items-center gap-2 flex-wrap">
+                        <span className="truncate max-w-[12rem] sm:max-w-none">{p.fullName}</span>
                         {typeof p.ecr === 'number' ? (
-                          <span className="stat-badge bg-accent/10 text-accent">ECR #{p.ecr}</span>
+                          <span className="stat-badge bg-accent/10 text-accent whitespace-nowrap">ECR #{p.ecr}</span>
                         ) : null}
                         {p.keeperCostLabel ? (
-                          <span className="stat-badge bg-primary/10 text-primary">{p.keeperCostLabel}</span>
+                          <span className="stat-badge bg-primary/10 text-primary whitespace-nowrap">{p.keeperCostLabel}</span>
                         ) : null}
                       </div>
                       <div className="text-xs text-muted-foreground">
