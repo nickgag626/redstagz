@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+export const runtime = 'nodejs'
+
 function normalizeName(s: string) {
   return s
     .toLowerCase()
@@ -66,143 +68,146 @@ async function yahooGet(accessToken: string, path: string) {
 }
 
 export async function POST(req: Request) {
-  const secret = process.env.IMPORT_SECRET
-  const leagueKey = process.env.YAHOO_LEAGUE_KEY
-  const teamKey = process.env.YAHOO_TEAM_KEY
+  try {
+    const secret = process.env.IMPORT_SECRET
+    const leagueKey = process.env.YAHOO_LEAGUE_KEY
+    const teamKey = process.env.YAHOO_TEAM_KEY
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!secret) return new NextResponse('Missing IMPORT_SECRET env', { status: 500 })
-  if (!leagueKey || !teamKey) return new NextResponse('Missing YAHOO_LEAGUE_KEY/YAHOO_TEAM_KEY', { status: 500 })
-  if (!supabaseUrl || !serviceKey) return new NextResponse('Missing Supabase service env', { status: 500 })
+    if (!secret) return new NextResponse('Missing IMPORT_SECRET env', { status: 500 })
+    if (!leagueKey || !teamKey) return new NextResponse('Missing YAHOO_LEAGUE_KEY/YAHOO_TEAM_KEY', { status: 500 })
+    if (!supabaseUrl || !serviceKey) return new NextResponse('Missing Supabase service env', { status: 500 })
 
-  const provided = req.headers.get('x-import-secret')
-  if (provided !== secret) return new NextResponse('Unauthorized', { status: 401 })
+    const provided = req.headers.get('x-import-secret')
+    if (provided !== secret) return new NextResponse('Unauthorized', { status: 401 })
 
-  const supabase = createClient(supabaseUrl, serviceKey)
+    const supabase = createClient(supabaseUrl, serviceKey)
 
-  // Find roster player ids
-  const { data: roster, error: rosterErr } = await supabase
-    .from('my_roster_players')
-    .select('player_id')
-    .eq('yahoo_league_key', leagueKey)
-    .eq('yahoo_team_key', teamKey)
+    const { data: roster, error: rosterErr } = await supabase
+      .from('my_roster_players')
+      .select('player_id')
+      .eq('yahoo_league_key', leagueKey)
+      .eq('yahoo_team_key', teamKey)
 
-  if (rosterErr) return new NextResponse(rosterErr.message, { status: 500 })
-  const playerIds = (roster ?? []).map((r: any) => r.player_id)
-  if (playerIds.length === 0) {
-    return NextResponse.json({ ok: true, updated: 0, note: 'No roster players found. Run import-keepers first.' })
-  }
-
-  const { data: players, error: playersErr } = await supabase
-    .from('players')
-    .select('id, full_name, mlb_team')
-    .in('id', playerIds)
-
-  if (playersErr) return new NextResponse(playersErr.message, { status: 500 })
-
-  const accessToken = await refreshYahooAccessToken()
-
-  // Pull league stat category mappings so we can label stat ids
-  const settingsJson = await yahooGet(accessToken, `league/${leagueKey}/settings?format=json`)
-  const league = settingsJson.fantasy_content.league
-  const settings = league?.[1]?.settings?.[0]
-  const statCats = settings?.stat_categories?.stats ?? []
-
-  const statIdToName: Record<string, string> = {}
-  for (const s of statCats) {
-    const st = s?.stat
-    if (!st) continue
-    statIdToName[String(st.stat_id)] = String(st.display_name ?? st.name ?? st.stat_id)
-  }
-
-  let updated = 0
-  const now = new Date().toISOString()
-
-  for (const p of players ?? []) {
-    const search = encodeURIComponent(p.full_name)
-    const searchJson = await yahooGet(accessToken, `league/${leagueKey}/players;search=${search}?format=json`)
-    const playersNode = searchJson.fantasy_content.league?.[1]?.players
-    const count = Number(playersNode?.count ?? 0)
-    if (!count) continue
-
-    // Find best match by name + MLB team abbr
-    let best: any[] | null = null
-    for (let i = 0; i < count; i++) {
-      const node = playersNode[String(i)]?.player
-      if (!node || !Array.isArray(node) || !Array.isArray(node[0])) continue
-      const arr = node[0]
-      const nameObj = pickFromYahooList(arr, 'name')
-      const full = nameObj?.full ? String(nameObj.full) : ''
-      const teamAbbr = pickFromYahooList(arr, 'editorial_team_abbr')
-
-      if (normalizeName(full) !== normalizeName(p.full_name)) continue
-      if (p.mlb_team && teamAbbr && String(teamAbbr).toUpperCase() !== String(p.mlb_team).toUpperCase()) {
-        continue
-      }
-      best = arr
-      break
+    if (rosterErr) return new NextResponse(rosterErr.message, { status: 500 })
+    const playerIds = (roster ?? []).map((r: any) => r.player_id)
+    if (playerIds.length === 0) {
+      return NextResponse.json({ ok: true, updated: 0, note: 'No roster players found. Run import-keepers first.' })
     }
 
-    // fallback to first
-    if (!best) {
-      const node = playersNode['0']?.player
-      if (node && Array.isArray(node) && Array.isArray(node[0])) best = node[0]
-    }
-    if (!best) continue
+    const { data: players, error: playersErr } = await supabase
+      .from('players')
+      .select('id, full_name, mlb_team')
+      .in('id', playerIds)
 
-    const yahooPlayerKey = pickFromYahooList(best, 'player_key')
-    const yahooPlayerId = pickFromYahooList(best, 'player_id')
-    if (!yahooPlayerKey) continue
+    if (playersErr) return new NextResponse(playersErr.message, { status: 500 })
 
-    // Pull 2025 season stats (final totals)
-    const statsJson = await yahooGet(
-      accessToken,
-      `player/${encodeURIComponent(String(yahooPlayerKey))}/stats;type=season;season=2025?format=json`,
-    )
+    const accessToken = await refreshYahooAccessToken()
 
-    const pl = statsJson.fantasy_content.player
-    let playerStats: any = null
-    for (const it of pl?.slice?.(1) ?? []) {
-      if (it && typeof it === 'object' && 'player_stats' in it) {
-        playerStats = (it as any).player_stats
-        break
-      }
-    }
+    // Pull league stat category mappings so we can label stat ids
+    const settingsJson = await yahooGet(accessToken, `league/${leagueKey}/settings?format=json`)
+    const league = settingsJson.fantasy_content.league
+    const settings = league?.[1]?.settings?.[0]
+    const statCats = settings?.stat_categories?.stats ?? []
 
-    const rawStats: Array<{ stat_id: string; value: string }> = []
-    const labeled: Record<string, string> = {}
-    const statsArr = playerStats?.stats ?? []
-    for (const s of statsArr) {
+    const statIdToName: Record<string, string> = {}
+    for (const s of statCats) {
       const st = s?.stat
       if (!st) continue
-      const statId = String(st.stat_id)
-      const val = String(st.value ?? '')
-      rawStats.push({ stat_id: statId, value: val })
-      const label = statIdToName[statId]
-      if (label) labeled[label] = val
+      statIdToName[String(st.stat_id)] = String(st.display_name ?? st.name ?? st.stat_id)
     }
 
-    const payload = {
-      season: 2025,
-      statMap: statIdToName,
-      labeled,
-      raw: rawStats,
+    let updated = 0
+    const now = new Date().toISOString()
+
+    for (const p of players ?? []) {
+      const search = encodeURIComponent(p.full_name)
+      const searchJson = await yahooGet(accessToken, `league/${leagueKey}/players;search=${search}?format=json`)
+      const playersNode = searchJson.fantasy_content.league?.[1]?.players
+      const count = Number(playersNode?.count ?? 0)
+      if (!count) continue
+
+      // Find best match by name + MLB team abbr
+      let best: any[] | null = null
+      for (let i = 0; i < count; i++) {
+        const node = playersNode[String(i)]?.player
+        if (!node || !Array.isArray(node) || !Array.isArray(node[0])) continue
+        const arr = node[0]
+        const nameObj = pickFromYahooList(arr, 'name')
+        const full = nameObj?.full ? String(nameObj.full) : ''
+        const teamAbbr = pickFromYahooList(arr, 'editorial_team_abbr')
+
+        if (normalizeName(full) !== normalizeName(p.full_name)) continue
+        if (p.mlb_team && teamAbbr && String(teamAbbr).toUpperCase() !== String(p.mlb_team).toUpperCase()) {
+          continue
+        }
+        best = arr
+        break
+      }
+
+      // fallback to first
+      if (!best) {
+        const node = playersNode['0']?.player
+        if (node && Array.isArray(node) && Array.isArray(node[0])) best = node[0]
+      }
+      if (!best) continue
+
+      const yahooPlayerKey = pickFromYahooList(best, 'player_key')
+      const yahooPlayerId = pickFromYahooList(best, 'player_id')
+      if (!yahooPlayerKey) continue
+
+      // Pull 2025 season stats (final totals)
+      const statsJson = await yahooGet(
+        accessToken,
+        `player/${encodeURIComponent(String(yahooPlayerKey))}/stats;type=season;season=2025?format=json`,
+      )
+
+      const pl = statsJson.fantasy_content.player
+      let playerStats: any = null
+      for (const it of pl?.slice?.(1) ?? []) {
+        if (it && typeof it === 'object' && 'player_stats' in it) {
+          playerStats = (it as any).player_stats
+          break
+        }
+      }
+
+      const rawStats: Array<{ stat_id: string; value: string }> = []
+      const labeled: Record<string, string> = {}
+      const statsArr = playerStats?.stats ?? []
+      for (const s of statsArr) {
+        const st = s?.stat
+        if (!st) continue
+        const statId = String(st.stat_id)
+        const val = String(st.value ?? '')
+        rawStats.push({ stat_id: statId, value: val })
+        const label = statIdToName[statId]
+        if (label) labeled[label] = val
+      }
+
+      const payload = {
+        season: 2025,
+        statMap: statIdToName,
+        labeled,
+        raw: rawStats,
+      }
+
+      const { error: upErr } = await supabase
+        .from('players')
+        .update({
+          yahoo_player_key: String(yahooPlayerKey),
+          yahoo_player_id: yahooPlayerId ? String(yahooPlayerId) : null,
+          stats_2025: payload,
+          stats_2025_updated_at: now,
+        })
+        .eq('id', p.id)
+
+      if (!upErr) updated++
     }
 
-    const { error: upErr } = await supabase
-      .from('players')
-      .update({
-        yahoo_player_key: String(yahooPlayerKey),
-        yahoo_player_id: yahooPlayerId ? String(yahooPlayerId) : null,
-        stats_2025: payload,
-        stats_2025_updated_at: now,
-      })
-      .eq('id', p.id)
-
-    if (!upErr) updated++
+    return NextResponse.json({ ok: true, updated })
+  } catch (e: any) {
+    return new NextResponse(e?.message ?? 'Unknown error', { status: 500 })
   }
-
-  return NextResponse.json({ ok: true, updated })
 }
