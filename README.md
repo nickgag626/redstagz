@@ -67,7 +67,27 @@ curl -X POST \
 
 This fetches FantasyPros overall rankings and updates `players.fantasypros_ecr` for any matched players.
 
+## Enrichment: Yahoo 2025 final statlines (H2H cats)
+
+### 1) Run migration in Supabase
+Run:
+- `supabase/migrations/0003_yahoo_stats_2025.sql`
+
+### 2) Ensure Vercel env vars are set
+- `YAHOO_CLIENT_ID`
+- `YAHOO_CLIENT_SECRET`
+- `YAHOO_REFRESH_TOKEN`
+
+### 3) Call the enrichment endpoint (protected)
+```bash
+curl -X POST \
+  -H "x-import-secret: $IMPORT_SECRET" \
+  https://redstagz.vercel.app/api/admin/enrich-yahoo-stats-2025
+```
+
+This resolves Yahoo `player_key`s via search and stores 2025 final statlines in `players.stats_2025`.
+
 ## Next steps
-- Show ECR + statlines in UI
+- Show ECR + key statline fields in UI
 - Admin dashboard to toggle keeper status + availability
 - Offer inbox for admin
