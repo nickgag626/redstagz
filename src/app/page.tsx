@@ -14,6 +14,8 @@ type TradeBlockRow = {
     primary_position: string | null
     headshot_url: string | null
     fantasypros_ecr: number | null
+    keeper_cost_round: number | null
+    keeper_cost_label: string | null
     stats_2025: any | null
   } | null
 }
@@ -45,7 +47,7 @@ export default async function Home() {
 
   const { data, error } = await supabase
     .from('my_roster_players')
-    .select('id, notes, keeper_status, players:player_id(id, full_name, mlb_team, primary_position, headshot_url, fantasypros_ecr, stats_2025)')
+    .select('id, notes, keeper_status, players:player_id(id, full_name, mlb_team, primary_position, headshot_url, fantasypros_ecr, keeper_cost_round, keeper_cost_label, stats_2025)')
     .eq('yahoo_league_key', leagueKey)
     .eq('yahoo_team_key', teamKey)
     .eq('is_available', true)
@@ -72,6 +74,8 @@ export default async function Home() {
       notes: r.notes,
       headshotUrl: r.players!.headshot_url,
       ecr: r.players!.fantasypros_ecr,
+      keeperCostLabel: r.players!.keeper_cost_label,
+      keeperCostRound: r.players!.keeper_cost_round,
       stats2025: r.players!.stats_2025,
     }))
     .sort((a, b) => (a.position ?? '').localeCompare(b.position ?? '') || a.fullName.localeCompare(b.fullName))

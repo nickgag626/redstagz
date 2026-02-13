@@ -17,6 +17,8 @@ export type TradePlayer = {
   notes?: string | null
   headshotUrl?: string | null
   ecr?: number | null
+  keeperCostLabel?: string | null
+  keeperCostRound?: number | null
   stats2025?: any | null
 }
 
@@ -399,6 +401,9 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
                         <span>{p.fullName}</span>
                         {typeof p.ecr === 'number' ? (
                           <span className="stat-badge bg-accent/10 text-accent">ECR #{p.ecr}</span>
+                        ) : null}
+                        {p.keeperCostLabel ? (
+                          <span className="stat-badge bg-primary/10 text-primary">{p.keeperCostLabel}</span>
                         ) : null}
                       </div>
                       <div className="text-xs text-muted-foreground">
