@@ -52,7 +52,22 @@ curl -X POST \
 
 This will upsert 28 players into `players` and add them to `my_roster_players` with `is_available=true`.
 
+## Enrichment: FantasyPros ECR
+
+### 1) Run migration in Supabase
+Run:
+- `supabase/migrations/0002_fantasypros.sql`
+
+### 2) Call the enrichment endpoint (protected)
+```bash
+curl -X POST \
+  -H "x-import-secret: $IMPORT_SECRET" \
+  https://redstagz.vercel.app/api/admin/enrich-fantasypros
+```
+
+This fetches FantasyPros overall rankings and updates `players.fantasypros_ecr` for any matched players.
+
 ## Next steps
-- Replace hardcoded importer with real scrape+enrichment (optional)
+- Show ECR + statlines in UI
 - Admin dashboard to toggle keeper status + availability
 - Offer inbox for admin
