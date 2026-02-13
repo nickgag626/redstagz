@@ -37,6 +37,8 @@ const LEAGUE_TEAMS = [
   "Tyler's Slugfest",
 ]
 
+const KEEPERS = new Set(['Aaron Judge', 'José Ramírez', 'Freddie Freeman', 'Bryce Harper'])
+
 export function TradeDashboard({ players }: { players: TradePlayer[] }) {
   const [selected, setSelected] = useState<TradePlayer | null>(null)
   const [search, setSearch] = useState('')
@@ -170,11 +172,17 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-1 -mx-1 px-1">
-                {filtered.map((p) => (
+                {filtered.map((p) => {
+                  const isKeeper = KEEPERS.has(p.fullName)
+                  return (
                   <div
                     key={p.rosterRowId}
-                    onClick={() => setSelected(p)}
-                    className={`player-row ${selected?.rosterRowId === p.rosterRowId ? 'selected' : ''}`}
+                    onClick={() => (isKeeper ? null : setSelected(p))}
+                    className={`player-row ${selected?.rosterRowId === p.rosterRowId ? 'selected' : ''} ${
+                      isKeeper ? 'bg-primary/10 border border-primary/30 cursor-not-allowed hover:bg-primary/10' : ''
+                    }`}
+                    aria-disabled={isKeeper}
+                    title={isKeeper ? 'Keeper (not available for trade)' : undefined}
                   >
                     <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0 overflow-hidden">
                       {p.headshotUrl ? (
@@ -224,9 +232,16 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
                         ))}
                     </div>
 
-                    <div className="text-xs text-muted-foreground">{p.keeperStatus}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {isKeeper ? (
+                        <span className="stat-badge bg-primary/15 text-primary">KEEP</span>
+                      ) : (
+                        p.keeperStatus
+                      )}
+                    </div>
                   </div>
-                ))}
+                  )
+                })}
 
                 {filtered.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground text-sm">No players found</div>
