@@ -136,6 +136,207 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 pb-8">
+          {/* Mobile bottom sheet trade panel */}
+          <AnimatePresence>
+            {selected ? (
+              <>
+                <motion.div
+                  key="backdrop"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+                  onClick={clearTrade}
+                />
+                <motion.div
+                  key="sheet"
+                  initial={{ y: 40, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: 40, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+                  className="fixed inset-x-0 bottom-0 z-50 lg:hidden"
+                >
+                  <div className="mx-auto max-w-6xl px-4 pb-4">
+                    <div className="dashboard-card max-h-[80vh] overflow-y-auto">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-sm font-extrabold tracking-tight flex items-center gap-2">
+                          <ArrowRightLeft className="w-4 h-4 text-primary" />
+                          Make a Trade
+                        </div>
+                        <button
+                          onClick={clearTrade}
+                          className="p-2 rounded-lg hover:bg-secondary transition-colors"
+                          aria-label="Close"
+                        >
+                          <X className="w-4 h-4 text-muted-foreground" />
+                        </button>
+                      </div>
+
+                      {/* Reuse same content states as desktop, but without the empty state */}
+                      <AnimatePresence mode="wait">
+                        {submitted ? (
+                          <motion.div
+                            key="submitted-mobile"
+                            initial={{ opacity: 0, scale: 0.98 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex flex-col items-center justify-center py-8 text-center"
+                          >
+                            <div className="w-16 h-16 rounded-full bg-success/20 flex items-center justify-center mb-4">
+                              <Check className="w-8 h-8 text-success" />
+                            </div>
+                            <p className="text-foreground font-bold text-lg">Trade Submitted!</p>
+                            <p className="text-muted-foreground text-sm mt-1">Awaiting review</p>
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="trade-form-mobile"
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }}
+                            className="flex flex-col"
+                          >
+                            {/* Selected player */}
+                            <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/30 mb-4">
+                              <div className="w-11 h-11 rounded-xl bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0 overflow-hidden">
+                                {selected.headshotUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={selected.headshotUrl}
+                                    alt={selected.fullName}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <span>{selected.position ?? '—'}</span>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-bold text-sm flex items-center gap-2">
+                                  <span>{selected.fullName}</span>
+                                  {typeof selected.ecr === 'number' ? (
+                                    <span className="stat-badge bg-accent/10 text-accent">ECR #{selected.ecr}</span>
+                                  ) : null}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {selected.position ?? '—'} · {selected.mlbTeam ?? '—'}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Statline */}
+                            <div className="grid grid-cols-5 gap-2 mb-4">
+                              {(isPitcher(selected.position)
+                                ? [
+                                    { label: 'W', value: getLabeledStat(selected.stats2025, ['W']) },
+                                    { label: 'K', value: getLabeledStat(selected.stats2025, ['K']) },
+                                    { label: 'ERA', value: getLabeledStat(selected.stats2025, ['ERA']) },
+                                    { label: 'WHIP', value: getLabeledStat(selected.stats2025, ['WHIP']) },
+                                    {
+                                      label: 'SV+H',
+                                      value: getLabeledStat(selected.stats2025, ['SV+H', 'SV+HLD', 'SV+HOLD']),
+                                    },
+                                  ]
+                                : [
+                                    { label: 'R', value: getLabeledStat(selected.stats2025, ['R']) },
+                                    { label: 'HR', value: getLabeledStat(selected.stats2025, ['HR']) },
+                                    { label: 'RBI', value: getLabeledStat(selected.stats2025, ['RBI']) },
+                                    { label: 'SB', value: getLabeledStat(selected.stats2025, ['SB']) },
+                                    { label: 'OBP', value: getLabeledStat(selected.stats2025, ['OBP']) },
+                                  ])
+                                .map((stat) => (
+                                  <div key={stat.label} className="text-center p-2 rounded-lg bg-secondary">
+                                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                                      {stat.label}
+                                    </div>
+                                    <div className="text-sm font-bold font-mono">{stat.value ?? '—'}</div>
+                                  </div>
+                                ))}
+                            </div>
+
+                            {/* Your team */}
+                            <div className="mb-4">
+                              <label className="block text-sm font-semibold mb-2">Your team</label>
+                              <select
+                                value={fromTeam}
+                                onChange={(e) => setFromTeam(e.target.value)}
+                                className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
+                              >
+                                <option value="">Select your team…</option>
+                                {LEAGUE_TEAMS.filter((t) => t !== 'Red Stagz').map((t) => (
+                                  <option key={t} value={t}>
+                                    {t}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Draft picks */}
+                            <div className="mb-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-semibold">Offer Draft Picks</span>
+                                {selectedPicks.length > 0 ? (
+                                  <span className="text-xs text-accent font-bold">{selectedPicks.length} selected</span>
+                                ) : null}
+                              </div>
+                              <div className="grid grid-cols-8 gap-1.5">
+                                {DRAFT_PICKS.map((pick) => (
+                                  <button
+                                    key={pick}
+                                    onClick={() => togglePick(pick)}
+                                    className={`inline-flex items-center justify-center w-10 h-10 rounded-lg text-sm font-bold border border-border cursor-pointer transition-all duration-150 active:scale-95 ${
+                                      selectedPicks.includes(pick)
+                                        ? 'bg-accent text-accent-foreground border-accent shadow-[0_0_12px_hsl(var(--accent)/0.3)]'
+                                        : 'bg-secondary text-muted-foreground hover:border-accent hover:text-accent'
+                                    }`}
+                                  >
+                                    {pick}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Notes */}
+                            <div className="mb-4">
+                              <label className="block text-sm font-semibold mb-2">Notes (optional)</label>
+                              <textarea
+                                value={notes}
+                                onChange={(e) => setNotes(e.target.value)}
+                                placeholder="Add any context (players you’re offering, positions you need, etc.)"
+                                className="w-full min-h-[90px] rounded-lg border border-border bg-secondary px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                              />
+                            </div>
+
+                            <button
+                              onClick={submitOffer}
+                              disabled={selectedPicks.length === 0 || !fromTeam}
+                              className="btn-trade w-full"
+                            >
+                              {!fromTeam
+                                ? 'Select your team'
+                                : selectedPicks.length === 0
+                                  ? 'Select picks to offer'
+                                  : `Submit Trade (${selectedPicks.length} pick${selectedPicks.length > 1 ? 's' : ''})`}
+                            </button>
+
+                            <div className="mt-3 text-xs text-muted-foreground">
+                              Prefer writing a detailed offer?{' '}
+                              <Link
+                                href={`/offer?player=${encodeURIComponent(selected.playerId)}`}
+                                className="underline"
+                              >
+                                Use the full form
+                              </Link>
+                              .
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                </motion.div>
+              </>
+            ) : null}
+          </AnimatePresence>
           {/* Player list */}
           <div className="lg:col-span-3 min-h-[60vh]">
             <div className="dashboard-card flex flex-col h-full">
@@ -250,8 +451,8 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
             </div>
           </div>
 
-          {/* Trade panel */}
-          <div className="lg:col-span-2">
+          {/* Trade panel (desktop) */}
+          <div className="hidden lg:block lg:col-span-2">
             <div className="dashboard-card flex flex-col">
               <h2 className="text-lg font-extrabold tracking-tight mb-3 flex items-center gap-2">
                 <ArrowRightLeft className="w-4 h-4 text-primary" />
