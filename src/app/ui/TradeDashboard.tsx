@@ -22,12 +22,28 @@ export type TradePlayer = {
 
 const DRAFT_PICKS = Array.from({ length: 24 }, (_, i) => i + 1)
 
+const LEAGUE_TEAMS = [
+  'Tunnel Snakes',
+  'Alex in Chains',
+  'Bleacher Creatures',
+  'ClutchHutch',
+  "Goin' Yahdgoats",
+  'Greasy Cap Advisors',
+  'Lollygaggers',
+  'Red Stagz',
+  'Runs-N-Roses',
+  'The Dirty Farm',
+  'Lake Monsters',
+  "Tyler's Slugfest",
+]
+
 export function TradeDashboard({ players }: { players: TradePlayer[] }) {
   const [selected, setSelected] = useState<TradePlayer | null>(null)
   const [search, setSearch] = useState('')
   const [posFilter, setPosFilter] = useState('ALL')
 
   const [selectedPicks, setSelectedPicks] = useState<number[]>([])
+  const [fromTeam, setFromTeam] = useState('')
   const [notes, setNotes] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
@@ -37,12 +53,13 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
 
   const clearTrade = () => {
     setSelectedPicks([])
+    setFromTeam('')
     setNotes('')
     setSelected(null)
   }
 
   const submitOffer = async () => {
-    if (!selected || selectedPicks.length === 0) return
+    if (!selected || selectedPicks.length === 0 || !fromTeam) return
 
     // MVP: create a clear offer text from picks. Manager still writes details in notes.
     const offerText = `Offering picks #${selectedPicks
@@ -52,7 +69,7 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
 
     // lightweight identity for public users
     const payload = {
-      teamName: 'Unknown team',
+      teamName: fromTeam,
       displayName: '',
       email: '',
       requestedPlayerId: selected.playerId,
@@ -317,6 +334,23 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
                         ))}
                     </div>
 
+                    {/* Your team */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-semibold mb-2">Your team</label>
+                      <select
+                        value={fromTeam}
+                        onChange={(e) => setFromTeam(e.target.value)}
+                        className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      >
+                        <option value="">Select your team…</option>
+                        {LEAGUE_TEAMS.filter((t) => t !== 'Red Stagz').map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                     {/* Draft picks */}
                     <div className="mb-4">
                       <div className="flex items-center justify-between mb-2">
@@ -358,12 +392,14 @@ export function TradeDashboard({ players }: { players: TradePlayer[] }) {
 
                     <button
                       onClick={submitOffer}
-                      disabled={selectedPicks.length === 0}
+                      disabled={selectedPicks.length === 0 || !fromTeam}
                       className="btn-trade w-full mt-auto"
                     >
-                      {selectedPicks.length === 0
-                        ? 'Select picks to offer'
-                        : `Submit Trade (${selectedPicks.length} pick${selectedPicks.length > 1 ? 's' : ''})`}
+                      {!fromTeam
+                        ? 'Select your team'
+                        : selectedPicks.length === 0
+                          ? 'Select picks to offer'
+                          : `Submit Trade (${selectedPicks.length} pick${selectedPicks.length > 1 ? 's' : ''})`}
                     </button>
 
                     <div className="mt-3 text-xs text-muted-foreground">
